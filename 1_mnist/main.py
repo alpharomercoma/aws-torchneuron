@@ -101,7 +101,11 @@ def train(args, model, device, train_loader, optimizer, epoch, use_mixed_precisi
         
         loss.backward()
         optimizer.step()
-        
+
+        # XLA requires explicit step marking to trigger execution
+        if device_type == 'xla' and NEURON_AVAILABLE:
+            torch_xla.sync()
+
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -132,6 +136,10 @@ def test(model, device, test_loader, use_mixed_precision=False):
             test_loss += F.nll_loss(output, target, reduction='sum').item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
+
+    # XLA requires explicit step marking to trigger execution
+    if device_type == 'xla' and NEURON_AVAILABLE:
+        torch_xla.sync()
 
     test_loss /= len(test_loader.dataset)
 
