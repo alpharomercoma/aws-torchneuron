@@ -3,22 +3,19 @@
 TorchNeuron MNIST Training Example
 
 This script trains a CNN on MNIST dataset, optimized for AWS Trainium using TorchNeuron.
-It supports both eager mode execution and torch.compile optimization.
 
 Key TorchNeuron features:
-- Automatic device detection via torch.accelerator API
-- JIT compilation with torch.compile(backend='neuron')
-- Mixed precision training with torch.autocast(device_type='neuron')
+- Automatic device detection via torch_xla
+- Automatic graph compilation and optimization via XLA compiler
+- Explicit synchronization with torch_xla.sync() for XLA devices
+
+Note: torch.compile is NOT used for XLA/Neuron devices because torch_xla provides
+its own graph compilation system. The XLA compiler automatically optimizes and
+compiles computation graphs for Trainium devices.
 
 Usage:
-    # Eager mode (on Trainium)
+    # Standard training on Trainium
     python main.py --epochs 3
-
-    # With torch.compile optimization
-    python main.py --epochs 3 --compile
-
-    # With mixed precision
-    python main.py --epochs 3 --compile --mixed-precision
 
     # CPU-only (for testing)
     python main.py --no-accel --epochs 1 --dry-run
@@ -192,7 +189,7 @@ def main():
     
     # TorchNeuron-specific arguments
     parser.add_argument('--compile', action='store_true',
-                        help='enable torch.compile optimization (uses backend="neuron" on Trainium)')
+                        help='enable torch.compile optimization (Note: not used for XLA/Neuron - XLA handles compilation automatically)')
     parser.add_argument('--mixed-precision', action='store_true',
                         help='enable mixed precision training with autocast')
     
@@ -243,12 +240,14 @@ def main():
     model = Net().to(device)
     
     # Apply torch.compile optimization
-    # TorchNeuron uses XLA backend - compile is handled internally
+    # Note: XLA/Neuron devices use torch_xla's automatic graph compilation
+    # and do NOT require torch.compile (which uses PyTorch's inductor backend)
     if args.compile and use_accel:
         if device_type == 'xla':
-            print("Applying torch.compile for XLA/Neuron devices")
-            # XLA compilation is handled automatically by torch_neuronx
-            model = torch.compile(model)
+            print("Note: XLA/Neuron devices use automatic graph compilation via torch_xla.")
+            print("torch.compile is not needed and may cause errors. Running without torch.compile.")
+            # XLA compilation is handled automatically by torch_neuronx/torch_xla
+            # Do NOT use torch.compile(model) here - it doesn't support XLA backend
         elif device_type == 'cuda':
             print("Applying torch.compile with default backend")
             model = torch.compile(model)
